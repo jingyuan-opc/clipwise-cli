@@ -3,7 +3,7 @@ name: clipwise-cli
 description: |
   本地视频处理 CLI 工具（agent-friendly，JSON in/out）。当用户要求分析视频、生成切片、
   提取精华片段、视频转写、生成图文稿、裁剪视频、去水印、添加字幕/标题、配音、拼接视频、
-  提取音频、翻译视频，或提到 "clipwise"、"切片"、"视频分析"、"短视频"、"highlight"
+  提取音频、翻译视频、解说视频、AI配音解说，或提到 "clipwise"、"切片"、"视频分析"、"短视频"、"highlight"、"narrate"、"解说"
   等关键词时使用。
   支持输入：本地视频文件路径、直接视频 URL、主流平台视频链接（B站、YouTube、小红书等）。
   本 skill 是完整参考文档，无需阅读源码即可正确使用所有工具。
@@ -326,7 +326,100 @@ subtitles JSON 格式：
 
 ---
 
-### 3.10 highlights — 一键精华切片提取
+### 3.10 narrate — AI 智能解说（中文化+配音）
+
+将长视频智能分段，为每段选择最佳处理策略：AI 撰写中文解说词并 TTS 配音（覆盖原声），或保留精彩原声并添加中文字幕。最终输出带标题、字幕、配音的完整解说视频。
+
+```bash
+# 使用火山引擎
+./clipwise narrate --input video.mp4 --output-dir ./out \
+  --provider volc --model doubao-seed-2-0-lite-260428
+
+# 使用本地 Claude CLI
+./clipwise narrate --input video.mp4 --output-dir ./out \
+  --provider claude --model opus
+```
+
+流水线步骤：
+1. **AI 分析** — 将视频划分为连续片段，每段标注 `narration`（解说覆盖原声）或 `original_audio`（保留原声+字幕），同时生成解说词/字幕文本、爆款标题
+2. **切片** — 按分段逐段切割
+3. **去水印** — 仅当 AI 检测到水印时执行
+4. **逐段处理** — `narration` 片段：TTS 替换原声 + 烧录字幕；`original_audio` 片段：去除硬字幕（如有）+ 烧录中文字幕
+5. **拼接** — 将所有处理后的片段合并为完整视频
+6. **标题** — 叠加 AI 生成的爆款标题
+
+| 参数 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--input` | 是 | — | 输入视频路径 |
+| `--output-dir` | 是 | — | 输出目录 |
+| `--voice` | 否 | `zh-CN-YunxiNeural` | 解说配音 TTS 语音 |
+| `--subtitle-style` | 否 | `xhs` | 字幕样式预设 |
+| `--title-style` | 否 | `xhs` | 标题样式预设 |
+| `--no-cache` | 否 | `false` | 禁用缓存 |
+| `--cache-dir` | 否 | `~/.clipwise/cache` | 缓存目录 |
+
+以及所有 [AI Provider 参数](#2-ai-provider-参数)。
+
+输出 `data` 字段：
+```json
+{
+  "input": "video.mp4",
+  "output": "./out/narrate_concat.mp4",
+  "title": "当这个AI说完这句话 全场都安静了",
+  "language": "en",
+  "style": "entertainment",
+  "segment_count": 5
+}
+```
+
+#### NarrateResult — AI 分析结果
+
+```json
+{
+  "title": "当这个AI说完这句话 全场都安静了",
+  "language": "en",
+  "style": "entertainment",
+  "watermark": { "x": 10, "y": 25, "w": 200, "h": 50 },
+  "has_hard_subtitles": true,
+  "hard_subtitle_region": { "x": 100, "y": 850, "w": 800, "h": 100 },
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 18.0,
+      "type": "narration",
+      "text": "今天这期视频来自一场硅谷闭门对谈，演讲者是推特创始人Jack Dorsey，他要用一个颠覆性的观点，重新定义公司这件事。",
+      "reason": "开场引入，交代背景和悬念"
+    },
+    {
+      "start": 18.0,
+      "end": 90.0,
+      "type": "original_audio",
+      "text": "我觉得AI的未来不在于取代人类 而在于增强人类的能力",
+      "reason": "嘉宾核心观点 保留原声感染力"
+    }
+  ]
+}
+```
+
+**segments 字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `start` / `end` | float | 片段起止时间（秒） |
+| `type` | string | `narration`：AI 解说覆盖原声 / `original_audio`：保留原声 |
+| `text` | string | `narration`：中文解说词；`original_audio`：中文字幕文本 |
+| `reason` | string | AI 选择该处理方式的理由 |
+
+**其他字段**：
+- `title`：AI 生成的爆款标题（不超过20字）
+- `language`：检测到的语言代码
+- `style`：视频风格判断（`entertainment` / `information`）
+- `has_hard_subtitles`：是否检测到原视频有硬字幕
+- `hard_subtitle_region`：硬字幕区域坐标（有硬字幕时自动去除并覆盖中文字幕）
+
+---
+
+### 3.11 highlights — 一键精华切片提取
 
 完整工作流：AI 分析视频 → 自动切片 → 去水印 → 配音（外文视频）→ 加字幕 → 加标题。输入一个长视频，输出多个可直接发布的精彩短片段。
 
@@ -427,7 +520,7 @@ highlights 内部 AI 分析返回的完整结构（`data` 中不直接暴露，�
 
 ---
 
-### 3.11 translate-video — 一键视频翻译中文化
+### 3.12 translate-video — 一键视频翻译中文化
 
 完整工作流：AI 分析语言 → 逐句转录翻译 → 去水印 → 重配音 → 烧录中文字幕。将外文视频转为带中文字幕+配音的完整视频。
 
@@ -498,6 +591,14 @@ highlights 内部 AI 分析返回的完整结构（`data` 中不直接暴露，�
 ```bash
 # 一键完成外文视频中文化
 ./clipwise translate-video --input english_video.mp4 --output-dir ./out
+```
+
+### 工作流 C：AI 智能解说
+
+适合需要将外文/长视频转为中文解说短视频的场景。AI 自动规划解说节奏、撰写解说词、保留精彩原声。
+
+```bash
+./clipwise narrate --input video.mp4 --output-dir ./out --provider claude --model opus
 ```
 
 ---
