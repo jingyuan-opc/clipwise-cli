@@ -31,7 +31,7 @@ Clipwise 以 **Skill** 形式分发给 AI Agent（如 Claude Code）。最简单
 在你的 AI Agent 对话中直接说：
 
 ```
-安装 clipwise-cli skill：从 https://github.com/xieqiang/clipwise-cli 克隆仓库，将对应平台的二进制文件放到 PATH 中，并完成 skill 注册。
+安装 clipwise-cli skill：从 https://github.com/jingyuan-opc/clipwise-cli 克隆仓库，将对应平台的二进制文件放到 PATH 中，并完成 skill 注册。
 ```
 
 Agent 会自动：
@@ -47,7 +47,7 @@ Agent 会自动：
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/xieqiang/clipwise-cli.git
+git clone https://github.com/jingyuan-opc/clipwise-cli.git
 cd clipwise-cli
 
 # 2. 选择对应平台的二进制
@@ -137,7 +137,9 @@ clipwise concat --inputs a.mp4,b.mp4,c.mp4 --output merged.mp4
 完整工具参数和用法请参考 [SKILL.md](./SKILL.md)。
 
 ## 关注
-
+### 微信公众号：
 ![wx](assets/wx.jpg)
+
+### AI剪精华视频号
 ![shp](assets/sph.jpg)
 
